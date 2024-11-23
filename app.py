@@ -10,7 +10,7 @@ API_KEY = os.getenv("x_api_key", "default_key")  # 環境変数が設定され�
 # APIキー認証デコレータ
 def require_api_key(func):
     def wrapper(*args, **kwargs):
-        api_key = request.headers.get("x_api_key", "").strip()
+        api_key = request.headers.get("x_api_key")  # 小文字の x_api_key を取得
         if not api_key:
             app.logger.warning("Missing API key in headers.")
             return jsonify({"error": "Unauthorized: API key missing"}), 401
