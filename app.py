@@ -2,10 +2,10 @@ from flask import Flask, request, jsonify, send_file
 from pptx import Presentation
 import os
 
-# 許可されたAPIキーを環境変数から取得
-API_KEY = os.environ.get("API_KEY", "default_api_key")
-
 app = Flask(__name__)
+
+# 許可されたAPIキー
+API_KEY = "MySecureAPIKey123"
 
 # APIキー認証デコレータ
 def require_api_key(func):
@@ -21,6 +21,11 @@ def require_api_key(func):
     wrapper.__name__ = func.__name__
     return wrapper
 
+# **ここに追加**
+@app.before_request
+def log_request_headers():
+    app.logger.info(f"Request headers: {dict(request.headers)}")
+
 # PPTファイルの保存パスを生成
 def get_presentation_path(presentation_id):
     return f"./presentations/{presentation_id}.pptx"
@@ -35,20 +40,16 @@ def create_slide():
     presentation_id = data.get('presentationId')
     slide_layout = data.get('slideLayout', 'Title and Content')
 
-    # 必要なフィールドが不足している場合
     if not title or not content or not presentation_id:
         return jsonify({"error": "Missing required fields"}), 400
 
-    # PPTファイルのパスを取得
     file_path = get_presentation_path(presentation_id)
 
-    # PPTファイルが存在しない場合は新規作成
     if not os.path.exists(file_path):
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)  # ディレクトリがない場合は作成
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         presentation = Presentation()
         presentation.save(file_path)
 
-    # 既存のPPTファイルを開いてスライドを追加
     presentation = Presentation(file_path)
     slide = presentation.slides.add_slide(presentation.slide_layouts[0])
     slide.shapes.title.text = title
@@ -61,30 +62,10 @@ def create_slide():
         "presentationId": presentation_id
     })
 
-# /download-presentation エンドポイント
-@app.route('/download-presentation', methods=['GET'])
-@require_api_key
-def download_presentation():
-    presentation_id = request.args.get('presentationId')
-    if not presentation_id:
-        app.logger.error("No presentationId provided")
-        return jsonify({"error": "presentationId is required"}), 400
-
-    file_path = get_presentation_path(presentation_id)
-    if not os.path.exists(file_path):
-        app.logger.error(f"File not found: {file_path}")
-        return jsonify({"error": "Presentation not found"}), 404
-
-    return send_file(file_path, as_attachment=True)
-
-@app.before_request
-def log_request_headers():
-    app.logger.info(f"Request headers: {dict(request.headers)}")
-
-@app.route('/', methods=['GET', 'HEAD'])
-def root_endpoint():
-    return jsonify({"message": "Welcome to the PowerPoint API!"}), 200
+@app.route('/', methods=['GET'])
+def root():
+    return jsonify({"message": "Welcome to the PowerPoint API!"})
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))  # Render のデフォルトポート
+    port = int(os.environ.get('PORT', 10000))
     app.run(debug=True, host='0.0.0.0', port=port)
