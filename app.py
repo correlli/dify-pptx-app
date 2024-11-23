@@ -1,40 +1,42 @@
 from flask import Flask, request, jsonify
+import urllib
 
 app = Flask(__name__)
 
-# エンドポイントの定義
+# /create-slide エンドポイント
 @app.route('/create-slide', methods=['POST'])
 def create_slide():
-    # リクエストからデータを取得
-    data = request.json
+    """
+    スライドを作成するエンドポイント。
+    リクエストボディでスライドのタイトル、コンテンツ、レイアウトを受け取る。
+    """
+    data = request.json  # JSONデータを取得
     title = data.get('title')
     content = data.get('content')
     presentation_id = data.get('presentationId')
     slide_layout = data.get('slideLayout', 'Title and Content')
-    
-    # スライド作成の処理（例: PowerPointスライド作成を行うコード）
-    # 今回はダミーのレスポンスを返す
+
+    # レスポンス例
     return jsonify({
         "success": True,
-        "message": f"Slide '{title}' created successfully."
+        "message": f"Slide '{title}' created successfully.",
+        "presentationId": presentation_id
     })
 
-# Flaskのルート一覧を表示する
+# /routes エンドポイント
 @app.route('/routes', methods=['GET'])
 def list_routes():
-    import urllib
+    """
+    現在のアプリに登録されている全てのエンドポイントをリストするデバッグ用エンドポイント。
+    """
     output = []
     for rule in app.url_map.iter_rules():
-        options = {}
-        for arg in rule.arguments:
-            options[arg] = f"[{arg}]"
         methods = ','.join(rule.methods)
         url = urllib.parse.unquote(f"{rule}")
         line = f"{url} ({methods})"
         output.append(line)
     return jsonify(routes=output)
 
-
-# Flaskアプリのエントリポイント
+# Flaskアプリのエントリーポイント
 if __name__ == '__main__':
     app.run(debug=True)
