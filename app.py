@@ -76,9 +76,14 @@ def download_presentation():
 
 @app.before_request
 def log_request_info():
-    app.logger.info(f"Headers received: {dict(request.headers)}")
-    app.logger.info(f"Request body: {request.get_json()}")
+    app.logger.info(f"Request method: {request.method}")
+    app.logger.info(f"Headers: {dict(request.headers)}")
+    app.logger.info(f"Body: {request.data}")
+
+@app.route('/', methods=['GET', 'HEAD'])
+def root_endpoint():
+    return jsonify({"message": "Welcome to the PowerPoint API!"}), 200
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 10000))  # Render のデフォルトポート
     app.run(debug=True, host='0.0.0.0', port=port)
