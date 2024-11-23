@@ -4,14 +4,13 @@ import os
 
 app = Flask(__name__)
 
-# 許可されたAPIキー
-API_KEY = "your_secret_api_key"
+# 許可されたAPIキー（環境変数から取得）
+API_KEY = os.getenv("x_api_key", "default_key")  # 環境変数が設定されていない場合は "default_key"
 
 # APIキー認証デコレータ
 def require_api_key(func):
     def wrapper(*args, **kwargs):
-        # APIキーを取得
-        api_key = request.headers.get("x_api_key")
+        api_key = request.headers.get("x_api_key", "").strip()
         if not api_key:
             app.logger.warning("Missing API key in headers.")
             return jsonify({"error": "Unauthorized: API key missing"}), 401
@@ -78,13 +77,11 @@ def download_presentation():
 
     return send_file(file_path, as_attachment=True)
 
-# 全リクエストでヘッダーをログに記録
 @app.before_request
 def log_request_headers():
     app.logger.info(f"Request headers: {dict(request.headers)}")
 
-# ルートエンドポイント
-@app.route('/', methods=['GET', 'HEAD'])
+@app.route('/', methods=['GET'])
 def root_endpoint():
     return jsonify({"message": "Welcome to the PowerPoint API!"}), 200
 
