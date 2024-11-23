@@ -24,36 +24,20 @@ def log_request_headers():
    app.logger.info(f"X_API_KEY value: {request.headers.get('X_API_KEY')}")
    app.logger.info("=== End Headers Debug ===\n")
 
+# 認証デコレータ
 def require_api_key(func):
-   def wrapper(*args, **kwargs):
-       app.logger.info("\n=== Headers Debug ===")
-       # 全てのヘッダーを出力
-       for header_name, header_value in request.headers.items():
-           app.logger.info(f"Header [{header_name}]: {header_value}")
-       
-       # 異なる方法でAPIキーを取得
-       api_key = request.headers.get("x_api_key")
-       api_key_2 = request.headers.get("X-Api-Key")
-       api_key_3 = request.headers.get("X_API_KEY")
-       
-       app.logger.info(f"api_key (underscore): {api_key}")
-       app.logger.info(f"api_key (hyphen): {api_key_2}")
-       app.logger.info(f"api_key (uppercase): {api_key_3}")
-       
-       # 実際のAPIキーを取得
-       actual_key = api_key or api_key_2 or api_key_3
-       
-       if not actual_key:
-           app.logger.warning("Missing API key in headers.")
-           return jsonify({"error": "Unauthorized: API key missing"}), 401
-           
-       if actual_key != API_KEY:
-           app.logger.warning(f"Invalid API key: {actual_key}")
-           return jsonify({"error": "Unauthorized: Invalid API key"}), 401
-           
-       return func(*args, **kwargs)
-   wrapper.__name__ = func.__name__
-   return wrapper
+    def wrapper(*args, **kwargs):
+        api_key = request.headers.get("X-API-KEY")  # ここを「X-API-KEY」に変更
+        if not api_key:
+            app.logger.warning("Missing API key in headers.")
+            return jsonify({"error": "Unauthorized: API key missing"}), 401
+        if api_key != API_KEY:
+            app.logger.warning(f"Invalid API key: {api_key}")
+            return jsonify({"error": "Unauthorized: Invalid API key"}), 401
+        return func(*args, **kwargs)
+    wrapper.__name__ = func.__name__
+    return wrapper
+
 
 # PPTファイルの保存パスを生成
 def get_presentation_path(presentation_id):
