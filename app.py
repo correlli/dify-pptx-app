@@ -10,14 +10,13 @@ API_KEY = os.environ.get('API_KEY', 'MySecureApiKey123')  # デフォルト値�
 # APIキー認証デコレータ
 def require_api_key(func):
     def wrapper(*args, **kwargs):
-        api_key = request.headers.get("API_KEY")  # ヘッダーからAPIキーを取得
+        api_key = request.headers.get("x_api_key")  # x_api_key に変更
         app.logger.info(f"Received API key: {api_key}")
         app.logger.info(f"Expected API key: {API_KEY}")
         
         if not api_key:
             app.logger.warning("Missing API key in headers.")
-            return jsonify({"error": "Unauthorized: API key missing"}), 401
-            
+            return jsonify({"error": "Unauthorized: API key missing"}), 401            
         if api_key != API_KEY:
             app.logger.warning(f"Invalid API key: {api_key}")
             return jsonify({"error": "Unauthorized: Invalid API key"}), 401
