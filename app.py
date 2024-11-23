@@ -4,12 +4,12 @@ import os
 app = Flask(__name__)
 
 # 許可されたAPIキー
-API_KEY = "your-secret-api-key"
+API_KEY = "your_secret_api_key"
 
 # 認証デコレータ
 def require_api_key(func):
     def wrapper(*args, **kwargs):
-        api_key = request.headers.get("X-API-KEY")
+        api_key = request.headers.get("x_api_key")
         if api_key != API_KEY:
             return jsonify({"error": "Unauthorized"}), 401
         return func(*args, **kwargs)
