@@ -77,7 +77,7 @@ def download_presentation():
 
     return send_file(file_path, as_attachment=True)
 
-@app.before_first_request
+@app.before_request
 def log_api_key_from_env():
     app.logger.info(f"Configured API_KEY: {os.getenv('API_KEY')}")
 
