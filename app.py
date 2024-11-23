@@ -93,11 +93,17 @@ def download_presentation():
    return send_file(file_path, as_attachment=True)
 
 @app.before_request
+@app.before_request
 def log_request_headers():
-   app.logger.info("===== Request Headers Start =====")
-   app.logger.info(f"Raw Headers: {dict(request.headers)}")
-   app.logger.info(f"x_api_key value: {request.headers.get('x_api_key')}")
-   app.logger.info("===== Request Headers End =====")
+    app.logger.info("\n=== Request Headers Debug ===")
+    headers = dict(request.headers)
+    app.logger.info(f"All Headers: {headers}")
+    app.logger.info(f"Content-Type: {headers.get('Content-Type')}")
+    app.logger.info(f"x_api_key (direct): {request.headers.get('x_api_key')}")
+    app.logger.info(f"x_api_key (dict): {headers.get('x_api_key')}")
+    app.logger.info(f"x-api-key (hyphen): {headers.get('x-api-key')}")
+    app.logger.info(f"X_API_KEY (upper): {headers.get('X_API_KEY')}")
+    app.logger.info("=== End Headers Debug ===\n")
 
 @app.route('/', methods=['GET'])
 def root_endpoint():
