@@ -11,6 +11,7 @@ def require_api_key(func):
     def wrapper(*args, **kwargs):
         api_key = request.headers.get("x_api_key")
         if api_key != API_KEY:
+            app.logger.warning("Unauthorized access attempt.")
             return jsonify({"error": "Unauthorized"}), 401
         return func(*args, **kwargs)
     wrapper.__name__ = func.__name__
@@ -22,37 +23,41 @@ def require_api_key(func):
 def create_slide():
     app.logger.info("Create Slide endpoint was called.")
     data = request.json
-    app.logger.info(f"Received data: {data}")
+    if not data:
+        app.logger.error("Request body is missing or not in JSON format.")
+        return jsonify({"error": "Request body is required"}), 400
     
     title = data.get('title')
     content = data.get('content')
     presentation_id = data.get('presentationId')
     slide_layout = data.get('slideLayout', 'Title and Content')
     
-    if not title or not content or not presentation_id:
-        app.logger.error("Missing required fields.")
-        return jsonify({"error": "Missing required fields"}), 400
+    missing_fields = [field for field in ['title', 'content', 'presentationId'] if not data.get(field)]
+    if missing_fields:
+        app.logger.error(f"Missing required fields: {', '.join(missing_fields)}")
+        return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
 
-    app.logger.info(f"Creating slide with title: {title}, content: {content}")
-
+    app.logger.info(f"Creating slide with title: {title}, content: {content}, layout: {slide_layout}")
     return jsonify({
         "success": True,
         "message": f"Slide '{title}' created successfully.",
         "presentationId": presentation_id
     })
 
+
+def get_presentation_path(presentation_id):
+    return f"./presentations/{presentation_id}.pptx"
+
 # プレゼンテーションダウンロードエンドポイント
 @app.route('/download-presentation', methods=['GET'])
 @require_api_key
 def download_presentation():
     presentation_id = request.args.get('presentationId')
-    app.logger.info(f"Received request for presentationId: {presentation_id}")
     if not presentation_id:
         app.logger.error("No presentationId provided")
         return jsonify({"error": "presentationId is required"}), 400
 
-    file_path = f"./presentations/{presentation_id}.pptx"
-    app.logger.info(f"Looking for file at: {file_path}")
+    file_path = get_presentation_path(presentation_id)
     if not os.path.exists(file_path):
         app.logger.error(f"File not found: {file_path}")
         return jsonify({"error": "Presentation not found"}), 404
