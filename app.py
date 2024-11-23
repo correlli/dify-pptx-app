@@ -20,6 +20,12 @@ def require_api_key(func):
     wrapper.__name__ = func.__name__
     return wrapper
 
+#Renderのヘルスチェックを通過できるようにする
+@app.route('/', methods=['GET', 'HEAD'])
+def index():
+    return jsonify({"message": "Flask app is running!"})
+
+
 # スライド作成エンドポイント
 @app.route('/create-slide', methods=['POST'])
 @require_api_key
