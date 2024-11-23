@@ -4,13 +4,15 @@ import os
 
 app = Flask(__name__)
 
-# 許可されたAPIキー（環境変数から取得）
-API_KEY = os.getenv("x_api_key", "default_key")  # 環境変数が設定されていない場合は "default_key"
+# 許可されたAPIキー
+API_KEY = os.getenv("API_KEY", "default_api_key")  # 環境変数からAPIキーを取得、デフォルト値を設定
 
 # APIキー認証デコレータ
 def require_api_key(func):
     def wrapper(*args, **kwargs):
-        api_key = request.headers.get("x_api_key")  # 小文字の x_api_key を取得
+        api_key = request.headers.get("x_api_key")  # ヘッダーからAPIキーを取得
+        app.logger.info(f"Received API key: {api_key}")  # ログで受信したAPIキーを確認
+        app.logger.info(f"Expected API key: {API_KEY}")  # ログで期待されるAPIキーを確認
         if not api_key:
             app.logger.warning("Missing API key in headers.")
             return jsonify({"error": "Unauthorized: API key missing"}), 401
@@ -30,6 +32,8 @@ def get_presentation_path(presentation_id):
 @require_api_key
 def create_slide():
     data = request.json
+    app.logger.info(f"Received request data: {data}")
+    
     title = data.get('title')
     content = data.get('content')
     presentation_id = data.get('presentationId')
@@ -37,6 +41,7 @@ def create_slide():
 
     # 必要なフィールドが不足している場合
     if not title or not content or not presentation_id:
+        app.logger.error("Missing required fields.")
         return jsonify({"error": "Missing required fields"}), 400
 
     # PPTファイルのパスを取得
@@ -66,6 +71,7 @@ def create_slide():
 @require_api_key
 def download_presentation():
     presentation_id = request.args.get('presentationId')
+    app.logger.info(f"Received request for presentationId: {presentation_id}")
     if not presentation_id:
         app.logger.error("No presentationId provided")
         return jsonify({"error": "presentationId is required"}), 400
@@ -77,10 +83,12 @@ def download_presentation():
 
     return send_file(file_path, as_attachment=True)
 
+# リクエストヘッダーをログに出力
 @app.before_request
 def log_request_headers():
     app.logger.info(f"Request headers: {dict(request.headers)}")
 
+# ルートエンドポイント
 @app.route('/', methods=['GET'])
 def root_endpoint():
     return jsonify({"message": "Welcome to the PowerPoint API!"}), 200
