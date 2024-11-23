@@ -10,12 +10,10 @@ API_KEY = "your_secret_api_key"
 def require_api_key(func):
     def wrapper(*args, **kwargs):
         api_key = request.headers.get("x_api_key")
-        if not api_key:
-            app.logger.warning("Missing API key in headers.")
-            return jsonify({"error": "Unauthorized: API key missing"}), 401
-        elif api_key != API_KEY:
-            app.logger.warning(f"Invalid API key provided: {api_key}")
-            return jsonify({"error": "Unauthorized: Invalid API key"}), 401
+        app.logger.info(f"Received API key: {api_key}")
+        if api_key != API_KEY:
+            app.logger.warning("Unauthorized: API key is missing or invalid.")
+            return jsonify({"error": "Unauthorized: API key missing or invalid"}), 401
         return func(*args, **kwargs)
     wrapper.__name__ = func.__name__
     return wrapper
@@ -83,11 +81,9 @@ def download_presentation():
 
 # リクエストの詳細をログに記録
 @app.before_request
-def log_request_info():
+def log_request_headers():
     app.logger.info(f"Request Headers: {dict(request.headers)}")
-    app.logger.info(f"Request Path: {request.path}")
-    if request.method in ['POST', 'PUT']:
-        app.logger.info(f"Request Body: {request.get_json()}")
+
 
 # メイン関数
 if __name__ == '__main__':
