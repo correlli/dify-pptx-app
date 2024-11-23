@@ -2,15 +2,15 @@ from flask import Flask, request, jsonify, send_file
 from pptx import Presentation
 import os
 
-app = Flask(__name__)
+# 許可されたAPIキーを環境変数から取得
+API_KEY = os.environ.get("API_KEY", "default_api_key")
 
-# 許可されたAPIキー
-API_KEY = "MySecureAPIKey123"
+app = Flask(__name__)
 
 # APIキー認証デコレータ
 def require_api_key(func):
     def wrapper(*args, **kwargs):
-        api_key = request.headers.get("X-API-KEY")
+        api_key = request.headers.get("x_api_key")
         if not api_key:
             app.logger.warning("Missing API key in headers.")
             return jsonify({"error": "Unauthorized: API key missing"}), 401
@@ -39,34 +39,43 @@ def create_slide():
     if not title or not content or not presentation_id:
         return jsonify({"error": "Missing required fields"}), 400
 
-    try:
-        # PPTファイルのパスを取得
-        file_path = get_presentation_path(presentation_id)
+    # PPTファイルのパスを取得
+    file_path = get_presentation_path(presentation_id)
 
-        # ディレクトリを作成（存在しない場合）
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-        # PPTファイルが存在しない場合は新規作成
-        if not os.path.exists(file_path):
-            presentation = Presentation()
-            presentation.save(file_path)
-
-        # 既存のPPTファイルを開いてスライドを追加
-        presentation = Presentation(file_path)
-        slide = presentation.slides.add_slide(presentation.slide_layouts[0])
-        slide.shapes.title.text = title
-        slide.placeholders[1].text = content
+    # PPTファイルが存在しない場合は新規作成
+    if not os.path.exists(file_path):
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)  # ディレクトリがない場合は作成
+        presentation = Presentation()
         presentation.save(file_path)
 
-        return jsonify({
-            "success": True,
-            "message": f"Slide '{title}' added to presentation '{presentation_id}' successfully.",
-            "presentationId": presentation_id
-        })
+    # 既存のPPTファイルを開いてスライドを追加
+    presentation = Presentation(file_path)
+    slide = presentation.slides.add_slide(presentation.slide_layouts[0])
+    slide.shapes.title.text = title
+    slide.placeholders[1].text = content
+    presentation.save(file_path)
 
-    except Exception as e:
-        app.logger.error(f"Failed to create slide: {e}")
-        return jsonify({"error": f"Failed to create slide: {e}"}), 500
+    return jsonify({
+        "success": True,
+        "message": f"Slide '{title}' added to presentation '{presentation_id}' successfully.",
+        "presentationId": presentation_id
+    })
+
+# /download-presentation エンドポイント
+@app.route('/download-presentation', methods=['GET'])
+@require_api_key
+def download_presentation():
+    presentation_id = request.args.get('presentationId')
+    if not presentation_id:
+        app.logger.error("No presentationId provided")
+        return jsonify({"error": "presentationId is required"}), 400
+
+    file_path = get_presentation_path(presentation_id)
+    if not os.path.exists(file_path):
+        app.logger.error(f"File not found: {file_path}")
+        return jsonify({"error": "Presentation not found"}), 404
+
+    return send_file(file_path, as_attachment=True)
 
 @app.before_request
 def log_request_headers():
