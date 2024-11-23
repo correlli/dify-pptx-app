@@ -1,33 +1,16 @@
 from flask import Flask, request, jsonify, send_file
 from pptx import Presentation
 import os
-import logging
-
-# ロギング設定を強化
-logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
-app.debug = True
-app.logger.setLevel(logging.DEBUG)
 
-# APIキーを直接定義
+# 許可されたAPIキー
 API_KEY = "MySecureAPIKey123"
 
-@app.before_request
-def log_request_headers():
-   app.logger.info("\n=== Request Headers Debug ===")
-   headers = dict(request.headers)
-   app.logger.info(f"All Headers: {headers}")
-   app.logger.info(f"Keys in headers: {list(headers.keys())}")
-   app.logger.info(f"x_api_key value: {request.headers.get('x_api_key')}")
-   app.logger.info(f"X-Api-Key value: {request.headers.get('X-Api-Key')}")
-   app.logger.info(f"X_API_KEY value: {request.headers.get('X_API_KEY')}")
-   app.logger.info("=== End Headers Debug ===\n")
-
-# 認証デコレータ
+# APIキー認証デコレータ
 def require_api_key(func):
     def wrapper(*args, **kwargs):
-        api_key = request.headers.get("X-API-KEY")  # ここを「X-API-KEY」に変更
+        api_key = request.headers.get("X-API-KEY")
         if not api_key:
             app.logger.warning("Missing API key in headers.")
             return jsonify({"error": "Unauthorized: API key missing"}), 401
@@ -38,82 +21,61 @@ def require_api_key(func):
     wrapper.__name__ = func.__name__
     return wrapper
 
-
 # PPTファイルの保存パスを生成
 def get_presentation_path(presentation_id):
-   return f"./presentations/{presentation_id}.pptx"
+    return f"./presentations/{presentation_id}.pptx"
 
-# create-slide エンドポイント
+# /create-slide エンドポイント
 @app.route('/create-slide', methods=['POST'])
 @require_api_key
 def create_slide():
-   app.logger.info("\n=== Create Slide Endpoint ===")
-   app.logger.info(f"Method: {request.method}")
-   app.logger.info(f"Headers: {dict(request.headers)}")
+    data = request.json
+    title = data.get('title')
+    content = data.get('content')
+    presentation_id = data.get('presentationId')
+    slide_layout = data.get('slideLayout', 'Title and Content')
 
-   try:
-       data = request.json
-       app.logger.info(f"Received request data: {data}")
-       
-       title = data.get('title')
-       content = data.get('content')
-       presentation_id = data.get('presentationId')
-       
-       if not all([title, content, presentation_id]):
-           return jsonify({"error": "Missing required fields"}), 400
-       
-       file_path = get_presentation_path(presentation_id)
-       os.makedirs(os.path.dirname(file_path), exist_ok=True)
-       
-       presentation = Presentation() if not os.path.exists(file_path) else Presentation(file_path)
-       slide = presentation.slides.add_slide(presentation.slide_layouts[0])
-       slide.shapes.title.text = title
-       slide.placeholders[1].text = content
-       presentation.save(file_path)
-       
-       return jsonify({
-           "success": True,
-           "message": f"Slide '{title}' added successfully.",
-           "presentationId": presentation_id
-       })
-   except Exception as e:
-       app.logger.error(f"Error creating slide: {str(e)}")
-       return jsonify({"error": f"Failed to create slide: {str(e)}"}), 500
+    # 必要なフィールドが不足している場合
+    if not title or not content or not presentation_id:
+        return jsonify({"error": "Missing required fields"}), 400
 
-# /test-headers エンドポイント
-@app.route('/test-headers', methods=['POST'])
-def test_headers():
-   app.logger.info("\n=== Test Headers Endpoint ===")
-   app.logger.info(f"Method: {request.method}")
-   app.logger.info(f"Headers: {dict(request.headers)}")
-   app.logger.info(f"Body: {request.get_data(as_text=True)}")
-   return jsonify({
-       "received_headers": dict(request.headers),
-       "method": request.method
-   }), 200
+    try:
+        # PPTファイルのパスを取得
+        file_path = get_presentation_path(presentation_id)
 
-# download-presentation エンドポイント
-@app.route('/download-presentation', methods=['GET'])
-@require_api_key
-def download_presentation():
-   presentation_id = request.args.get('presentationId')
-   app.logger.info(f"Received request for presentationId: {presentation_id}")
-   
-   if not presentation_id:
-       return jsonify({"error": "presentationId is required"}), 400
-       
-   file_path = get_presentation_path(presentation_id)
-   if not os.path.exists(file_path):
-       return jsonify({"error": "Presentation not found"}), 404
-       
-   return send_file(file_path, as_attachment=True)
+        # ディレクトリを作成（存在しない場合）
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-@app.route('/', methods=['GET'])
+        # PPTファイルが存在しない場合は新規作成
+        if not os.path.exists(file_path):
+            presentation = Presentation()
+            presentation.save(file_path)
+
+        # 既存のPPTファイルを開いてスライドを追加
+        presentation = Presentation(file_path)
+        slide = presentation.slides.add_slide(presentation.slide_layouts[0])
+        slide.shapes.title.text = title
+        slide.placeholders[1].text = content
+        presentation.save(file_path)
+
+        return jsonify({
+            "success": True,
+            "message": f"Slide '{title}' added to presentation '{presentation_id}' successfully.",
+            "presentationId": presentation_id
+        })
+
+    except Exception as e:
+        app.logger.error(f"Failed to create slide: {e}")
+        return jsonify({"error": f"Failed to create slide: {e}"}), 500
+
+@app.before_request
+def log_request_headers():
+    app.logger.info(f"Request headers: {dict(request.headers)}")
+
+@app.route('/', methods=['GET', 'HEAD'])
 def root_endpoint():
-   app.logger.info("\n=== Root Endpoint Access ===")
-   app.logger.info(f"Headers: {dict(request.headers)}")
-   return jsonify({"message": "Welcome to the PowerPoint API!"}), 200
+    return jsonify({"message": "Welcome to the PowerPoint API!"}), 200
 
 if __name__ == '__main__':
-   port = int(os.environ.get('PORT', 10000))
-   app.run(debug=True, host='0.0.0.0', port=port)
+    port = int(os.environ.get('PORT', 10000))  # Render のデフォルトポート
+    app.run(debug=True, host='0.0.0.0', port=port)
