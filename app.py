@@ -76,7 +76,7 @@ def download_presentation():
 
 @app.before_request
 def log_request_info():
-    print("Headers: ", dict(request.headers))
+    app.logger.info(f"Headers received: {dict(request.headers)}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
