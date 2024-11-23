@@ -59,7 +59,7 @@ def require_api_key(func):
 def get_presentation_path(presentation_id):
    return f"./presentations/{presentation_id}.pptx"
 
-# create-slide エンドポイントを追加
+# create-slide エンドポイント
 @app.route('/create-slide', methods=['POST'])
 @require_api_key
 def create_slide():
@@ -96,7 +96,7 @@ def create_slide():
        app.logger.error(f"Error creating slide: {str(e)}")
        return jsonify({"error": f"Failed to create slide: {str(e)}"}), 500
 
-# テスト用エンドポイント
+# /test-headers エンドポイント
 @app.route('/test-headers', methods=['POST'])
 def test_headers():
    app.logger.info("\n=== Test Headers Endpoint ===")
