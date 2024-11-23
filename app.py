@@ -11,9 +11,12 @@ API_KEY = "your_secret_api_key"
 def require_api_key(func):
     def wrapper(*args, **kwargs):
         api_key = request.headers.get("x_api_key")
+        if not api_key:
+            app.logger.warning("Missing API key in headers.")
+            return jsonify({"error": "Unauthorized: API key missing"}), 401
         if api_key != API_KEY:
-            app.logger.warning("Unauthorized access attempt.")
-            return jsonify({"error": "Unauthorized"}), 401
+            app.logger.warning(f"Invalid API key: {api_key}")
+            return jsonify({"error": "Unauthorized: Invalid API key"}), 401
         return func(*args, **kwargs)
     wrapper.__name__ = func.__name__
     return wrapper
@@ -75,10 +78,8 @@ def download_presentation():
     return send_file(file_path, as_attachment=True)
 
 @app.before_request
-def log_request_info():
-    app.logger.info(f"Request method: {request.method}")
-    app.logger.info(f"Headers: {dict(request.headers)}")
-    app.logger.info(f"Body: {request.data}")
+def log_request_headers():
+    app.logger.info(f"Request headers: {dict(request.headers)}")
 
 @app.route('/', methods=['GET', 'HEAD'])
 def root_endpoint():
