@@ -14,7 +14,6 @@ def log_request_headers():
     app.logger.info(f"All Headers: {headers}")
     app.logger.info(f"Keys in headers: {list(headers.keys())}")
     app.logger.info(f"x_api_key value: {request.headers.get('x_api_key')}")
-    app.logger.info(f"Raw x_api_key value: {request.headers.raw.get('x_api_key')}")
     app.logger.info("=== End Headers Debug ===\n")
 
 def require_api_key(func):
@@ -38,6 +37,7 @@ def require_api_key(func):
         return func(*args, **kwargs)
     wrapper.__name__ = func.__name__
     return wrapper
+
 
 # PPTファイルの保存パスを生成
 def get_presentation_path(presentation_id):
@@ -97,7 +97,7 @@ def download_presentation():
     if not os.path.exists(file_path):
         app.logger.error(f"File not found: {file_path}")
         return jsonify({"error": "Presentation not found"}), 404
-        
+        a
     return send_file(file_path, as_attachment=True)
 
 @app.route('/', methods=['GET'])
