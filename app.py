@@ -4,13 +4,13 @@ import os
 
 app = Flask(__name__)
 
-# 許可されたAPIキー
-API_KEY = os.getenv("API_KEY", "default_api_key")  # 環境変数からAPIキーを取得、デフォルト値を設定
+# 新しいAPIキー
+API_KEY = "MySecureAPIKey123"  # シンプルかつ安全な値に変更
 
 # APIキー認証デコレータ
 def require_api_key(func):
     def wrapper(*args, **kwargs):
-        api_key = request.headers.get("x_api_key")  # ヘッダーからAPIキーを取得
+        api_key = request.headers.get("x-api-key")  # ヘッダーからAPIキーを取得
         app.logger.info(f"Received API key: {api_key}")  # ログで受信したAPIキーを確認
         app.logger.info(f"Expected API key: {API_KEY}")  # ログで期待されるAPIキーを確認
         if not api_key:
@@ -83,12 +83,10 @@ def download_presentation():
 
     return send_file(file_path, as_attachment=True)
 
-# リクエストヘッダーをログに出力
 @app.before_request
 def log_request_headers():
     app.logger.info(f"Request headers: {dict(request.headers)}")
 
-# ルートエンドポイント
 @app.route('/', methods=['GET'])
 def root_endpoint():
     return jsonify({"message": "Welcome to the PowerPoint API!"}), 200
