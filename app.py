@@ -10,7 +10,8 @@ API_KEY = "your_secret_api_key"
 # APIキー認証デコレータ
 def require_api_key(func):
     def wrapper(*args, **kwargs):
-        api_key = request.headers.get("x_api_key") or request.headers.get("X-Api-Key")
+        # APIキーを取得
+        api_key = request.headers.get("x_api_key")
         if not api_key:
             app.logger.warning("Missing API key in headers.")
             return jsonify({"error": "Unauthorized: API key missing"}), 401
@@ -77,10 +78,12 @@ def download_presentation():
 
     return send_file(file_path, as_attachment=True)
 
+# 全リクエストでヘッダーをログに記録
 @app.before_request
-def log_api_key_from_env():
-    app.logger.info(f"Configured API_KEY: {os.getenv('API_KEY')}")
+def log_request_headers():
+    app.logger.info(f"Request headers: {dict(request.headers)}")
 
+# ルートエンドポイント
 @app.route('/', methods=['GET', 'HEAD'])
 def root_endpoint():
     return jsonify({"message": "Welcome to the PowerPoint API!"}), 200
