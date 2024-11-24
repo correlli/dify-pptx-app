@@ -21,13 +21,14 @@ def require_api_key(func):
     wrapper.__name__ = func.__name__
     return wrapper
 
-# **リクエストヘッダーをログに記録**
+# リクエストヘッダーをログに記録
 @app.before_request
 def log_request_headers():
     app.logger.info(f"Request headers: {dict(request.headers)}")
 
 # PPTファイルの保存パスを生成
 def get_presentation_path(presentation_id):
+    # 必要であれば /tmp ディレクトリを使用
     return f"./presentations/{presentation_id}.pptx"
 
 # /create-slide エンドポイント
@@ -44,39 +45,29 @@ def create_slide():
         return jsonify({"error": "Missing required fields"}), 400
 
     file_path = get_presentation_path(presentation_id)
-    app.logger.info(f"Creating slide for presentation: {presentation_id}")
-    app.logger.info(f"File path: {file_path}")
 
     try:
-        # ファイルが存在しない場合は新規作成
         if not os.path.exists(file_path):
-            app.logger.info(f"File does not exist. Creating new presentation at: {file_path}")
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            app.logger.info(f"Creating new presentation at: {file_path}")
             presentation = Presentation()
             presentation.save(file_path)
 
-        # 既存のファイルにスライドを追加
         presentation = Presentation(file_path)
         slide = presentation.slides.add_slide(presentation.slide_layouts[0])
         slide.shapes.title.text = title
         slide.placeholders[1].text = content
         presentation.save(file_path)
 
-        # ファイルの存在確認
-        if not os.path.exists(file_path):
-            app.logger.error(f"File save failed. File does not exist at: {file_path}")
-            return jsonify({"error": f"Failed to save presentation at: {file_path}"}), 500
-
-        app.logger.info(f"Slide added successfully to: {file_path}")
+        app.logger.info(f"Slide added successfully to {file_path}")
         return jsonify({
             "success": True,
             "message": f"Slide '{title}' added to presentation '{presentation_id}' successfully.",
             "presentationId": presentation_id
         })
-
     except Exception as e:
-        app.logger.error(f"Error while creating slide: {e}")
-        return jsonify({"error": f"Failed to create slide: {str(e)}"}), 500
+        app.logger.error(f"Failed to create slide: {e}")
+        return jsonify({"error": f"Failed to create slide: {e}"}), 500
 
 # /download-presentation エンドポイント
 @app.route('/download-presentation', methods=['GET'])
@@ -84,7 +75,6 @@ def create_slide():
 def download_presentation():
     presentation_id = request.args.get('presentationId')
     if not presentation_id:
-        app.logger.error("No presentationId provided")
         return jsonify({"error": "presentationId is required"}), 400
 
     file_path = get_presentation_path(presentation_id)
@@ -92,13 +82,14 @@ def download_presentation():
         app.logger.error(f"File not found: {file_path}")
         return jsonify({"error": "Presentation not found"}), 404
 
-    # MIMEタイプを明示的に設定
-    return send_file(
-        file_path,
-        as_attachment=True,
-        mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation'
-    )
+    try:
+        app.logger.info(f"Sending file: {file_path}")
+        return send_file(file_path, as_attachment=True)
+    except Exception as e:
+        app.logger.error(f"Failed to send file: {e}")
+        return jsonify({"error": f"Failed to send file: {e}"}), 500
 
+# ルートエンドポイント
 @app.route('/', methods=['GET'])
 def root():
     return jsonify({"message": "Welcome to the PowerPoint API!"})
