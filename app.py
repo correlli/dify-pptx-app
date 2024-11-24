@@ -35,18 +35,23 @@ def get_presentation_path(presentation_id):
 @app.route('/create-slide', methods=['POST'])
 @require_api_key
 def create_slide():
-    data = request.json
-    title = data.get('title')
-    content = data.get('content')
-    presentation_id = data.get('presentationId')
-    slide_layout = data.get('slideLayout', 'Title and Content')
-
-    if not title or not content or not presentation_id:
-        return jsonify({"error": "Missing required fields"}), 400
-
-    file_path = get_presentation_path(presentation_id)
-
+    app.logger.info("Received request to /create-slide")
     try:
+        data = request.json
+        app.logger.info(f"Request data: {data}")
+
+        title = data.get('title')
+        content = data.get('content')
+        presentation_id = data.get('presentationId')
+        slide_layout = data.get('slideLayout', 'Title and Content')
+
+        if not title or not content or not presentation_id:
+            app.logger.error("Missing required fields in request")
+            return jsonify({"error": "Missing required fields"}), 400
+
+        file_path = get_presentation_path(presentation_id)
+        app.logger.info(f"Target file path: {file_path}")
+
         if not os.path.exists(file_path):
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             app.logger.info(f"Creating new presentation at: {file_path}")
@@ -58,8 +63,8 @@ def create_slide():
         slide.shapes.title.text = title
         slide.placeholders[1].text = content
         presentation.save(file_path)
-
         app.logger.info(f"Slide added successfully to {file_path}")
+
         return jsonify({
             "success": True,
             "message": f"Slide '{title}' added to presentation '{presentation_id}' successfully.",
