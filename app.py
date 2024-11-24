@@ -1,13 +1,16 @@
+import os
 from flask import Flask, request, jsonify, send_file
 from pptx import Presentation
-import os
 
 app = Flask(__name__)
 
-# 許可されたAPIキー
+# 環境変数からベースディレクトリを取得（デフォルトは /opt/render/project/presentations）
+PRESENTATION_BASE_DIR = os.environ.get("PRESENTATION_BASE_DIR", "/opt/render/project/presentations")
+
+# APIキー
 API_KEY = "MySecureAPIKey123"
 
-# APIキー認証デコレータ
+# 認証デコレータ
 def require_api_key(func):
     def wrapper(*args, **kwargs):
         api_key = request.headers.get("x_api_key")
@@ -21,20 +24,14 @@ def require_api_key(func):
     wrapper.__name__ = func.__name__
     return wrapper
 
-# **ベースディレクトリを動的に設定する関数**
+# プレゼンテーションファイルのパスを取得
 def get_presentation_path(presentation_id):
-    # 実行環境に依存しないパス構成
-    base_dir = os.getenv(
-        "PRESENTATION_BASE_DIR", 
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "presentations")
-    )
-    return os.path.join(base_dir, f"{presentation_id}.pptx")
+    return os.path.join(PRESENTATION_BASE_DIR, f"{presentation_id}.pptx")
 
 # スライド作成エンドポイント
 @app.route('/create-slide', methods=['POST'])
 @require_api_key
 def create_slide():
-    app.logger.debug("Received request at /create-slide endpoint")
     data = request.json
     title = data.get('title')
     content = data.get('content')
@@ -44,27 +41,22 @@ def create_slide():
     if not title or not content or not presentation_id:
         return jsonify({"error": "Missing required fields"}), 400
 
-    # プレゼンテーションファイルのパス
+    # 保存パス
     file_path = get_presentation_path(presentation_id)
-    app.logger.debug(f"Target file path for presentation: {file_path}")
 
-    # 必要に応じてディレクトリ作成
+    # ディレクトリが存在しない場合は作成
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-    # ファイルが存在しない場合は新規作成
+    # 新規または既存のファイルを開いて編集
     if not os.path.exists(file_path):
-        app.logger.info(f"Creating new PowerPoint file at {file_path}")
         presentation = Presentation()
         presentation.save(file_path)
 
-    # 既存ファイルを開いてスライドを追加
-    app.logger.debug(f"Opening PowerPoint file at {file_path}")
     presentation = Presentation(file_path)
     slide = presentation.slides.add_slide(presentation.slide_layouts[0])
     slide.shapes.title.text = title
     slide.placeholders[1].text = content
     presentation.save(file_path)
-    app.logger.info(f"Slide '{title}' successfully added to {presentation_id}")
 
     return jsonify({
         "success": True,
@@ -72,25 +64,19 @@ def create_slide():
         "presentationId": presentation_id
     })
 
-# プレゼンテーションダウンロードエンドポイント
 @app.route('/download-presentation', methods=['GET'])
 @require_api_key
 def download_presentation():
-    app.logger.debug("Received request at /download-presentation endpoint")
     presentation_id = request.args.get('presentationId')
     if not presentation_id:
         return jsonify({"error": "presentationId is required"}), 400
 
     file_path = get_presentation_path(presentation_id)
-    app.logger.debug(f"Looking for file at: {file_path}")
     if not os.path.exists(file_path):
-        app.logger.error(f"File not found: {file_path}")
         return jsonify({"error": "Presentation not found"}), 404
 
-    app.logger.info(f"Serving file: {file_path}")
     return send_file(file_path, as_attachment=True)
 
-# ルートエンドポイント
 @app.route('/', methods=['GET'])
 def root():
     return jsonify({"message": "Welcome to the PowerPoint API!"})
