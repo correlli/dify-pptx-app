@@ -1,8 +1,14 @@
 from flask import Flask, request, jsonify, send_file
 from pptx import Presentation
 import os
+import logging
+import sys
 
 app = Flask(__name__)
+
+# ログ設定
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+app.logger.setLevel(logging.DEBUG)
 
 # 許可されたAPIキー
 API_KEY = "MySecureAPIKey123"
@@ -28,17 +34,16 @@ def log_request_headers():
 
 # PPTファイルの保存パスを生成
 def get_presentation_path(presentation_id):
-    # 必要であれば /tmp ディレクトリを使用
     return f"./presentations/{presentation_id}.pptx"
 
 # /create-slide エンドポイント
 @app.route('/create-slide', methods=['POST'])
 @require_api_key
 def create_slide():
-    app.logger.info("Received request to /create-slide")
+    app.logger.debug("Received request at /create-slide endpoint")
     try:
         data = request.json
-        app.logger.info(f"Request data: {data}")
+        app.logger.debug(f"Request payload: {data}")
 
         title = data.get('title')
         content = data.get('content')
@@ -50,20 +55,21 @@ def create_slide():
             return jsonify({"error": "Missing required fields"}), 400
 
         file_path = get_presentation_path(presentation_id)
-        app.logger.info(f"Target file path: {file_path}")
+        app.logger.debug(f"Target file path for presentation: {file_path}")
 
         if not os.path.exists(file_path):
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            app.logger.info(f"Creating new presentation at: {file_path}")
+            app.logger.info(f"Creating new PowerPoint file at {file_path}")
             presentation = Presentation()
             presentation.save(file_path)
 
+        app.logger.debug(f"Opening PowerPoint file at {file_path}")
         presentation = Presentation(file_path)
         slide = presentation.slides.add_slide(presentation.slide_layouts[0])
         slide.shapes.title.text = title
         slide.placeholders[1].text = content
         presentation.save(file_path)
-        app.logger.info(f"Slide added successfully to {file_path}")
+        app.logger.info(f"Slide '{title}' successfully added to {presentation_id}")
 
         return jsonify({
             "success": True,
@@ -71,28 +77,34 @@ def create_slide():
             "presentationId": presentation_id
         })
     except Exception as e:
-        app.logger.error(f"Failed to create slide: {e}")
-        return jsonify({"error": f"Failed to create slide: {e}"}), 500
+        app.logger.exception("An error occurred while creating a slide")
+        return jsonify({"error": f"Failed to create slide: {str(e)}"}), 500
 
 # /download-presentation エンドポイント
 @app.route('/download-presentation', methods=['GET'])
 @require_api_key
 def download_presentation():
-    presentation_id = request.args.get('presentationId')
-    if not presentation_id:
-        return jsonify({"error": "presentationId is required"}), 400
-
-    file_path = get_presentation_path(presentation_id)
-    if not os.path.exists(file_path):
-        app.logger.error(f"File not found: {file_path}")
-        return jsonify({"error": "Presentation not found"}), 404
-
+    app.logger.debug("Received request at /download-presentation endpoint")
     try:
-        app.logger.info(f"Sending file: {file_path}")
+        presentation_id = request.args.get('presentationId')
+        app.logger.debug(f"Received presentationId: {presentation_id}")
+
+        if not presentation_id:
+            app.logger.error("No presentationId provided")
+            return jsonify({"error": "presentationId is required"}), 400
+
+        file_path = get_presentation_path(presentation_id)
+        app.logger.debug(f"Looking for file at: {file_path}")
+
+        if not os.path.exists(file_path):
+            app.logger.error(f"File not found: {file_path}")
+            return jsonify({"error": "Presentation not found"}), 404
+
+        app.logger.info(f"Serving file: {file_path}")
         return send_file(file_path, as_attachment=True)
     except Exception as e:
-        app.logger.error(f"Failed to send file: {e}")
-        return jsonify({"error": f"Failed to send file: {e}"}), 500
+        app.logger.exception("An error occurred while serving the file")
+        return jsonify({"error": f"Failed to download presentation: {str(e)}"}), 500
 
 # ルートエンドポイント
 @app.route('/', methods=['GET'])
