@@ -84,27 +84,26 @@ def create_slide():
 @app.route('/download-presentation', methods=['GET'])
 @require_api_key
 def download_presentation():
-    app.logger.debug("Received request at /download-presentation endpoint")
+    presentation_id = request.args.get('presentationId')
+    app.logger.debug(f"Received presentationId: {presentation_id}")
+    
+    if not presentation_id:
+        app.logger.error("No presentationId provided")
+        return jsonify({"error": "presentationId is required"}), 400
+
+    file_path = get_presentation_path(presentation_id)
+    app.logger.debug(f"Looking for file at: {file_path}")
+    
+    if not os.path.exists(file_path):
+        app.logger.error(f"File not found: {file_path}")
+        return jsonify({"error": "Presentation not found"}), 404
+
     try:
-        presentation_id = request.args.get('presentationId')
-        app.logger.debug(f"Received presentationId: {presentation_id}")
-
-        if not presentation_id:
-            app.logger.error("No presentationId provided")
-            return jsonify({"error": "presentationId is required"}), 400
-
-        file_path = get_presentation_path(presentation_id)
-        app.logger.debug(f"Looking for file at: {file_path}")
-
-        if not os.path.exists(file_path):
-            app.logger.error(f"File not found: {file_path}")
-            return jsonify({"error": "Presentation not found"}), 404
-
         app.logger.info(f"Serving file: {file_path}")
         return send_file(file_path, as_attachment=True)
     except Exception as e:
-        app.logger.exception("An error occurred while serving the file")
-        return jsonify({"error": f"Failed to download presentation: {str(e)}"}), 500
+        app.logger.error(f"Failed to serve file: {str(e)}")
+        return jsonify({"error": "Failed to serve file"}), 500
 
 # ルートエンドポイント
 @app.route('/', methods=['GET'])
