@@ -83,20 +83,21 @@ def create_slide():
 @require_api_key
 def download_presentation():
     presentation_id = request.args.get('presentationId')
-    file_path = get_presentation_path(presentation_id)
-
-    app.logger.info(f"Download request for presentation: {presentation_id}")
-    app.logger.info(f"File path: {file_path}")
-
     if not presentation_id:
-        app.logger.error("Missing presentationId in request.")
-        return jsonify({"error": "Missing presentationId"}), 400
+        app.logger.error("No presentationId provided")
+        return jsonify({"error": "presentationId is required"}), 400
 
+    file_path = get_presentation_path(presentation_id)
     if not os.path.exists(file_path):
-        app.logger.error(f"Presentation not found: {file_path}")
+        app.logger.error(f"File not found: {file_path}")
         return jsonify({"error": "Presentation not found"}), 404
 
-    return send_file(file_path, as_attachment=True)
+    # MIMEタイプを明示的に設定
+    return send_file(
+        file_path,
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    )
 
 @app.route('/', methods=['GET'])
 def root():
