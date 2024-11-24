@@ -21,7 +21,7 @@ def require_api_key(func):
     wrapper.__name__ = func.__name__
     return wrapper
 
-# **ここに追加**
+# **リクエストヘッダーをログに記録**
 @app.before_request
 def log_request_headers():
     app.logger.info(f"Request headers: {dict(request.headers)}")
@@ -44,23 +44,59 @@ def create_slide():
         return jsonify({"error": "Missing required fields"}), 400
 
     file_path = get_presentation_path(presentation_id)
+    app.logger.info(f"Creating slide for presentation: {presentation_id}")
+    app.logger.info(f"File path: {file_path}")
 
-    if not os.path.exists(file_path):
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        presentation = Presentation()
+    try:
+        # ファイルが存在しない場合は新規作成
+        if not os.path.exists(file_path):
+            app.logger.info(f"File does not exist. Creating new presentation at: {file_path}")
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            presentation = Presentation()
+            presentation.save(file_path)
+
+        # 既存のファイルにスライドを追加
+        presentation = Presentation(file_path)
+        slide = presentation.slides.add_slide(presentation.slide_layouts[0])
+        slide.shapes.title.text = title
+        slide.placeholders[1].text = content
         presentation.save(file_path)
 
-    presentation = Presentation(file_path)
-    slide = presentation.slides.add_slide(presentation.slide_layouts[0])
-    slide.shapes.title.text = title
-    slide.placeholders[1].text = content
-    presentation.save(file_path)
+        # ファイルの存在確認
+        if not os.path.exists(file_path):
+            app.logger.error(f"File save failed. File does not exist at: {file_path}")
+            return jsonify({"error": f"Failed to save presentation at: {file_path}"}), 500
 
-    return jsonify({
-        "success": True,
-        "message": f"Slide '{title}' added to presentation '{presentation_id}' successfully.",
-        "presentationId": presentation_id
-    })
+        app.logger.info(f"Slide added successfully to: {file_path}")
+        return jsonify({
+            "success": True,
+            "message": f"Slide '{title}' added to presentation '{presentation_id}' successfully.",
+            "presentationId": presentation_id
+        })
+
+    except Exception as e:
+        app.logger.error(f"Error while creating slide: {e}")
+        return jsonify({"error": f"Failed to create slide: {str(e)}"}), 500
+
+# /download-presentation エンドポイント
+@app.route('/download-presentation', methods=['GET'])
+@require_api_key
+def download_presentation():
+    presentation_id = request.args.get('presentationId')
+    file_path = get_presentation_path(presentation_id)
+
+    app.logger.info(f"Download request for presentation: {presentation_id}")
+    app.logger.info(f"File path: {file_path}")
+
+    if not presentation_id:
+        app.logger.error("Missing presentationId in request.")
+        return jsonify({"error": "Missing presentationId"}), 400
+
+    if not os.path.exists(file_path):
+        app.logger.error(f"Presentation not found: {file_path}")
+        return jsonify({"error": "Presentation not found"}), 404
+
+    return send_file(file_path, as_attachment=True)
 
 @app.route('/', methods=['GET'])
 def root():
