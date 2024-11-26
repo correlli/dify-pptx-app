@@ -1,6 +1,7 @@
 import os
 from flask import Flask, request, jsonify, send_file
 from pptx import Presentation
+from uuid import uuid4
 
 app = Flask(__name__)
 
@@ -36,9 +37,14 @@ def create_slide():
     title = data.get('title')
     content = data.get('content')
     presentation_id = data.get('presentationId')
+
+    # プレゼンテーションIDが指定されていない場合、一意のIDを生成
+    if not presentation_id:
+        presentation_id = str(uuid4())
+
     slide_layout = data.get('slideLayout', 'Title and Content')
 
-    if not title or not content or not presentation_id:
+    if not title or not content:
         return jsonify({"error": "Missing required fields"}), 400
 
     # 保存パス
@@ -64,6 +70,7 @@ def create_slide():
         "presentationId": presentation_id
     })
 
+# プレゼンテーションダウンロードエンドポイント
 @app.route('/download-presentation', methods=['GET'])
 @require_api_key
 def download_presentation():
@@ -77,6 +84,7 @@ def download_presentation():
 
     return send_file(file_path, as_attachment=True)
 
+# ルートエンドポイント
 @app.route('/', methods=['GET'])
 def root():
     return jsonify({"message": "Welcome to the PowerPoint API!"})
